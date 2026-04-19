@@ -1,0 +1,15 @@
+[
+  { "nombre": "Programación I", "creditos": 4 },
+  { "nombre": "Matemática Discreta", "creditos": 3 },
+  { "nombre": "Bases de Datos", "creditos": 4 },
+  { "nombre": "Redes de Computadoras", "creditos": 3 },
+  { "nombre": "Programación II", "creditos": 4 },
+  { "nombre": "Matemática", "creditos": 2 },
+  { "nombre": "Inglés Técnico I", "creditos": 4 },
+  { "nombre": "Inglés Técnico II", "creditos": 3 },
+  { "nombre": "Química y Física", "creditos": 3 },
+  { "nombre": "Programación III", "creditos": 4 },
+  { "nombre": "Laboratorio de Química y Física", "creditos": 2 },
+  { "nombre": "Inglés Técnico III", "creditos": 4 },
+  { "nombre": "Inglés Conversacional", "creditos": 3 }
+]
