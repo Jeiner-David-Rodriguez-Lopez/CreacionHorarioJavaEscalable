@@ -8,15 +8,11 @@ public class Login {
             case "2":
                 return new Profesor();
             case "3":
-                FuenteAsignaturas fuente = new FuenteAsignaturasJSON();
-                VentanaCoordinador ventana = new VentanaCoordinador(fuente);
-                ventana.mostrar();
-
-                return new Coordinador();
+                FuenteAsignaturas fuente = new FuenteAsignaturasMemoria();
+                return new Coordinador(fuente);
             default:
-                JOptionPane.showMessageDialog(null, "ID inválido");
+                JOptionPane.showMessageDialog(null, "ID invalido");
                 return null;
         }
     }
 }
-

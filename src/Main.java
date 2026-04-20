@@ -4,11 +4,11 @@ public class Main {
     public Usuario persona;
 
     public static void main(String[] args) {
-        // Crear y mostrar la ventana de login
-        VentanaLogin ventana = new VentanaLogin();
-        ventana.mostrar();
+        SwingUtilities.invokeLater(() -> {
+            VentanaLogin ventana = new VentanaLogin();
+            ventana.mostrar();
+        });
     }
 }
-
 
 
