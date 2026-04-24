@@ -1,0 +1,55 @@
+{
+  "Materias": [
+    { "nombre": "Programación I", "creditos": 4, "Departamento": "Computación" },
+    { "nombre": "Matemática Discreta", "creditos": 3, "Departamento":"Matemáticas" },
+    { "nombre": "Bases de Datos", "creditos": 4,"Departamento":"Computación" },
+    { "nombre": "Redes de Computadoras", "creditos": 3,"Departamento": "Computación" },
+    { "nombre": "Programación II", "creditos": 4,"Departamento": "Computación" },
+    { "nombre": "Matemática", "creditos": 2,"Departamento": "Matemáticas" },
+    { "nombre": "Inglés Técnico I", "creditos": 4,"Departamento": "Idiomas" },
+    { "nombre": "Inglés Técnico II", "creditos": 3,"Departamento": "Idiomas" },
+    { "nombre": "Química y Física", "creditos": 3,"Departamento": "Ciencias" },
+    { "nombre": "Programación III", "creditos": 4,"Departamento": "Computación" },
+    { "nombre": "Laboratorio de Química y Física", "creditos": 2,"Departamento": "Ciencias" },
+    { "nombre": "Inglés Técnico III", "creditos": 4,"Departamento": "Idiomas"},
+    { "nombre": "Inglés Conversacional", "creditos": 3,"Departamento": "Idiomas" }
+  ],
+  "AsignaturasTeoricas": [
+    { "nombre": "Ciencias", "aulaTeorica": "A1" },
+    { "nombre": "Ciencias", "aulaTeorica": "B2" },
+    { "nombre": "Ciencias", "aulaTeorica": "C1" },
+    { "nombre": "Ciencias", "aulaTeorica": "D3" },
+    {"nombre":  "Idiomas", "aulaTeorica": "A2"},
+    { "nombre": "Idiomas", "aulaTeorica": "A3" },
+    { "nombre": "Idiomas", "aulaTeorica": "B1" },
+    { "nombre": "Ciencias", "aulaTeorica": "C2" },
+    { "nombre": "Idiomas", "aulaTeorica": "D3" },
+    {"nombre":  "Idiomas", "aulaTeorica": "E1"},
+    { "nombre": "Matemáticas", "aulaTeorica": "A1" },
+    { "nombre": "Matemáticas", "aulaTeorica": "B2" },
+    { "nombre": "Matemáticas", "aulaTeorica": "C1" },
+    { "nombre": "Matemáticas", "aulaTeorica": "D3" }
+  ],
+  "AsignaturasPracticas": [
+    { "nombre": "Laboratorios de Ciencias", "aulaPractica": "Lab-01" },
+    { "nombre": "Computación", "aulaPractica": "LabProg-02" },
+    { "nombre": "Computación", "aulaPractica": "LabProg-03" },
+    { "nombre": "Laboratorios de Ciencias", "aulaPractica": "Lab-02" },
+    { "nombre": "Computación", "aulaPractica": "LabProg-00" },
+    { "nombre": "Computación", "aulaPractica": "LabProg-03" }
+  ],
+  "Profesores": [
+    { "nombre": "Carlos Pérez", "Departamento": "Idiomas" },
+    { "nombre": "Juan Pérez", "Departamento": "Idiomas" },
+    { "nombre": "Pedro Pérez", "Departamento": "Idiomas" },
+    { "nombre": "Jean Marín", "Departamento": "Ciencias" },
+    { "nombre": "Oscar Viquez", "Departamento": "Idiomas" },
+    { "nombre": "Ana Padilla", "Departamento": "Computación" },
+    { "nombre": "Julia Campos", "Departamento": "Computación" },
+    { "nombre": "Francisco Hernandez", "Departamento": "Computación" },
+    { "nombre": "Allan Torrez", "Departamento": "Ciencias" },
+    { "nombre": "Marcos Zamora", "Departamento": "Computación" },
+    { "nombre": "Julio Rodríguez", "Departamento": "Ciencias" },
+    { "nombre": "Fabian López", "Departamento": "Ciencias" }
+  ]
+}
