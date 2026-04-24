@@ -2,6 +2,7 @@ package gui;
 
 import aulas.Aula;
 import horario.EntradaHorario;
+import horario.GeneradorHorarios;
 import horario.Semestre;
 import usuarios.Coordinador;
 
@@ -181,8 +182,8 @@ public class PanelCoordinador extends JPanel {
 
     private void generarHorario() {
         Semestre s = actual();
-        s.generar(aulas);
-        lblInfo.setText("Horario generado para Semestre " + s.getNumero());
+        GeneradorHorarios.generarGlobal(semestres, aulas);
+        lblInfo.setText("Horarios generados (global) hasta Semestre " + s.getNumero());
         lblInfo.setForeground(Colores.ACENTO2);
         verHorario();
         verConflictos();
