@@ -1,7 +1,9 @@
 package horario;
 
 import asignaturas.Asignatura;
+import asignaturas.Teorica;
 import aulas.Aula;
+import aulas.AulaTeoria;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -99,6 +101,10 @@ public class Semestre {
             Map<Integer, Set<String>> ocupacionAulaGlobal,
             Random rnd
     ) {
+        if (esVirtual(a)) {
+            return buscarAsignacionVirtual(a, bloques, ocupacionProfesorLocal, ocupacionProfesorGlobal, rnd);
+        }
+
         List<Bloque> candidatosBloque = new ArrayList<>(bloques);
         Collections.shuffle(candidatosBloque, rnd);
 
@@ -124,6 +130,27 @@ public class Semestre {
         Aula aula = compatibles.isEmpty() ? aulas.get(0) : compatibles.get(0);
         String conflicto = "Sin combinacion libre (profesor/aula)";
         return new Asignacion(bloque, aula, conflicto);
+    }
+
+    private Asignacion buscarAsignacionVirtual(
+            Asignatura a,
+            List<Bloque> bloques,
+            Set<String> ocupacionProfesorLocal,
+            Map<String, Set<String>> ocupacionProfesorGlobal,
+            Random rnd
+    ) {
+        List<Bloque> candidatosBloque = new ArrayList<>(bloques);
+        Collections.shuffle(candidatosBloque, rnd);
+
+        for (Bloque b : candidatosBloque) {
+            String bloqueKey = keyBloque(b);
+            if (!profesorOcupado(a, bloqueKey, ocupacionProfesorLocal, ocupacionProfesorGlobal)) {
+                return new Asignacion(b, aulaVirtual(a), null);
+            }
+        }
+
+        Bloque bloque = bloques.get(rnd.nextInt(bloques.size()));
+        return new Asignacion(bloque, aulaVirtual(a), "Sin bloque libre de profesor (virtual)");
     }
 
     private boolean profesorOcupado(
@@ -160,6 +187,18 @@ public class Semestre {
 
     private String keyBloque(Bloque b) {
         return b.getDia() + "|" + b.getInicio();
+    }
+
+    private boolean esVirtual(Asignatura a) {
+        if (!(a instanceof Teorica)) return false;
+        String modalidad = ((Teorica) a).getModalidad();
+        return modalidad != null && modalidad.trim().equalsIgnoreCase("Virtual");
+    }
+
+    private Aula aulaVirtual(Asignatura a) {
+        int base = Math.abs((a.getNombre() + "|virtual").hashCode());
+        int numero = 900000 + (base % 90000);
+        return new AulaTeoria("Virtual - " + a.getNombre(), numero, "Plataforma Virtual", 999, true, true);
     }
 
     private static class Asignacion {

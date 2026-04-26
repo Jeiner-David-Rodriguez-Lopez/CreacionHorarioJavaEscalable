@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -44,6 +45,7 @@ public class DatosMemoria implements FuenteAsignaturas {
     private final List<Practica>   practicas  = new ArrayList<>();
     private final List<Aula>       aulas      = new ArrayList<>();
     private final Map<Integer, List<Asignatura>> materiasPorSemestre = new HashMap<>();
+    private final ResolucionesCoordinadorJSON.Datos resoluciones = new ResolucionesCoordinadorJSON.Datos();
     private final Random random = new Random();
 
     public DatosMemoria() {
@@ -54,6 +56,7 @@ public class DatosMemoria implements FuenteAsignaturas {
             cargarAulasRespaldo();
             poblarSemestresPorMateria();
         }
+        aplicarResolucionesPersistidas();
     }
 
     private boolean cargarDesdeJson() {
@@ -371,8 +374,156 @@ public class DatosMemoria implements FuenteAsignaturas {
         return new ArrayList<>(aulas);
     }
 
+    public Profesor agregarProfesorPersistente(String nombre, String departamento) {
+        String n = repararTexto(nombre);
+        String d = repararTexto(departamento);
+        if (n == null || n.isBlank() || d == null || d.isBlank()) return null;
+
+        for (Profesor p : profesores) {
+            if (normalizar(p.getNombre()).equals(normalizar(n))) {
+                return p;
+            }
+        }
+
+        String cedula = "EXT-" + String.format("%04d", profesores.size() + 1);
+        Profesor nuevo = new Profesor(n.trim(), cedula, d.trim(), disponibilidadPorDefecto());
+        profesores.add(nuevo);
+
+        resoluciones.profesoresExtra.add(new ResolucionesCoordinadorJSON.ProfesorExtra(
+                nuevo.getNombre(), nuevo.getDepartamento(), nuevo.getCedula()));
+        guardarResoluciones();
+        return nuevo;
+    }
+
+    public Aula agregarAulaPersistente(String tipo, String nombre, int numero, String ubicacion, int capacidad) {
+        String t = tipo == null ? "" : tipo.trim().toLowerCase(Locale.ROOT);
+        String n = repararTexto(nombre);
+        String u = repararTexto(ubicacion);
+        if (!"teoria".equals(t) && !"laboratorio".equals(t)) return null;
+        if (n == null || n.isBlank()) return null;
+        if (u == null || u.isBlank()) u = "Edif. Anexo";
+        if (capacidad <= 0) capacidad = 30;
+
+        if (numero <= 0 || existeAulaNumero(numero)) {
+            numero = siguienteNumeroAula();
+        }
+
+        Aula aula;
+        if ("laboratorio".equals(t)) {
+            aula = new AulaLab(n.trim(), numero, u.trim(), capacidad, Arrays.asList("PC", "JDK", "IDE"));
+        } else {
+            aula = new AulaTeoria(n.trim(), numero, u.trim(), capacidad, true, true);
+        }
+        aulas.add(aula);
+
+        resoluciones.aulasExtra.add(new ResolucionesCoordinadorJSON.AulaExtra(
+                t, aula.getNombre(), aula.getNumero(), aula.getUbicacion(), aula.getCapacidad()));
+        guardarResoluciones();
+        return aula;
+    }
+
+    public boolean marcarAsignaturaVirtualPersistente(String nombreAsignatura) {
+        if (nombreAsignatura == null || nombreAsignatura.isBlank()) return false;
+        Asignatura a = buscarMateriaPorNombre(nombreAsignatura);
+        if (!(a instanceof Teorica)) {
+            return false;
+        }
+        ((Teorica) a).setModalidad("Virtual");
+
+        boolean existe = resoluciones.materiasVirtuales.stream()
+                .anyMatch(m -> normalizar(m).equals(normalizar(a.getNombre())));
+        if (!existe) {
+            resoluciones.materiasVirtuales.add(a.getNombre());
+            guardarResoluciones();
+        }
+        return true;
+    }
+
+    public List<String> obtenerDepartamentos() {
+        Set<String> out = new LinkedHashSet<>();
+        for (Profesor p : profesores) {
+            if (p.getDepartamento() != null && !p.getDepartamento().isBlank()) {
+                out.add(p.getDepartamento());
+            }
+        }
+        return new ArrayList<>(out);
+    }
+
+    public List<Profesor> obtenerProfesoresPorDepartamento(String departamento) {
+        String objetivo = normalizar(departamento);
+        List<Profesor> out = new ArrayList<>();
+        for (Profesor p : profesores) {
+            if (normalizar(p.getDepartamento()).equals(objetivo)) {
+                out.add(p);
+            }
+        }
+        return out;
+    }
+
     @Override public List<Asignatura> obtenerMaterias()  { return materias; }
     @Override public List<Teorica>    obtenerTeoricas()  { return teoricas; }
     @Override public List<Practica>   obtenerPracticas() { return practicas; }
     @Override public List<Profesor>   obtenerProfesores(){ return profesores; }
+
+    private void aplicarResolucionesPersistidas() {
+        ResolucionesCoordinadorJSON.Datos datos = ResolucionesCoordinadorJSON.cargar();
+        resoluciones.profesoresExtra.clear();
+        resoluciones.profesoresExtra.addAll(datos.profesoresExtra);
+        resoluciones.aulasExtra.clear();
+        resoluciones.aulasExtra.addAll(datos.aulasExtra);
+        resoluciones.materiasVirtuales.clear();
+        resoluciones.materiasVirtuales.addAll(datos.materiasVirtuales);
+
+        for (ResolucionesCoordinadorJSON.ProfesorExtra p : resoluciones.profesoresExtra) {
+            if (profesorPorNombre(p.nombre) != null) continue;
+            profesores.add(new Profesor(
+                    p.nombre,
+                    p.cedula == null || p.cedula.isBlank() ? "EXT-" + (profesores.size() + 1) : p.cedula,
+                    p.departamento,
+                    disponibilidadPorDefecto()));
+        }
+
+        for (ResolucionesCoordinadorJSON.AulaExtra a : resoluciones.aulasExtra) {
+            if (existeAulaNumero(a.numero)) continue;
+            if ("laboratorio".equalsIgnoreCase(a.tipo)) {
+                aulas.add(new AulaLab(a.nombre, a.numero, a.ubicacion, a.capacidad, Arrays.asList("PC", "JDK", "IDE")));
+            } else {
+                aulas.add(new AulaTeoria(a.nombre, a.numero, a.ubicacion, a.capacidad, true, true));
+            }
+        }
+
+        for (String materiaVirtual : resoluciones.materiasVirtuales) {
+            Asignatura a = buscarMateriaPorNombre(materiaVirtual);
+            if (a instanceof Teorica) {
+                ((Teorica) a).setModalidad("Virtual");
+            }
+        }
+    }
+
+    private void guardarResoluciones() {
+        ResolucionesCoordinadorJSON.guardar(resoluciones);
+    }
+
+    private boolean existeAulaNumero(int numero) {
+        for (Aula a : aulas) {
+            if (a.getNumero() == numero) return true;
+        }
+        return false;
+    }
+
+    private int siguienteNumeroAula() {
+        int max = 100;
+        for (Aula a : aulas) {
+            if (a.getNumero() > max) max = a.getNumero();
+        }
+        return max + 1;
+    }
+
+    private Asignatura buscarMateriaPorNombre(String nombre) {
+        String objetivo = normalizar(nombre);
+        for (Asignatura a : materias) {
+            if (normalizar(a.getNombre()).equals(objetivo)) return a;
+        }
+        return null;
+    }
 }

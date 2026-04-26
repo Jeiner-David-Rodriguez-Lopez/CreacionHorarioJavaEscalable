@@ -100,7 +100,7 @@ public class PanelHorario extends JPanel {
                 h.getAsignatura().tipo(),
                 h.getAsignatura().getProfesor() != null
                     ? h.getAsignatura().getProfesor().getNombre() : "-",
-                "Aula " + h.getAula().getNumero(),
+                textoAula(h),
                 h.tieneConflicto() ? "[!] " + h.getConflicto() : "OK"
             });
         }
@@ -139,5 +139,13 @@ public class PanelHorario extends JPanel {
                 return this;
             }
         });
+    }
+
+    private String textoAula(EntradaHorario h) {
+        if (h.getAula() == null) return "-";
+        if (h.getAula().getNombre() != null && h.getAula().getNombre().startsWith("Virtual")) {
+            return "Virtual";
+        }
+        return "Aula " + h.getAula().getNumero();
     }
 }

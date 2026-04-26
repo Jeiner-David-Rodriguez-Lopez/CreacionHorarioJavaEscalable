@@ -2,6 +2,7 @@ package datos;
 
 import aulas.Aula;
 import horario.Semestre;
+import usuarios.Profesor;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -78,6 +79,26 @@ public class Escenarios {
 
     public static void limpiarPersistencia() {
         HorariosPersistencia.limpiarArchivos();
+    }
+
+    public static Profesor contratarProfesor(String nombre, String departamento) {
+        return FUENTE.agregarProfesorPersistente(nombre, departamento);
+    }
+
+    public static Aula agregarAula(String tipo, String nombre, int numero, String ubicacion, int capacidad) {
+        return FUENTE.agregarAulaPersistente(tipo, nombre, numero, ubicacion, capacidad);
+    }
+
+    public static boolean marcarAsignaturaVirtual(String nombreAsignatura) {
+        return FUENTE.marcarAsignaturaVirtualPersistente(nombreAsignatura);
+    }
+
+    public static List<String> obtenerDepartamentos() {
+        return FUENTE.obtenerDepartamentos();
+    }
+
+    public static List<Profesor> profesoresPorDepartamento(String departamento) {
+        return FUENTE.obtenerProfesoresPorDepartamento(departamento);
     }
 
     private static List<Semestre> filtrarSemestres(int desde, int hasta) {

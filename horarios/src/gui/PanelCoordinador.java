@@ -6,6 +6,7 @@ import horario.EntradaHorario;
 import horario.GeneradorHorarios;
 import horario.Semestre;
 import usuarios.Coordinador;
+import usuarios.Profesor;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -13,6 +14,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.text.Normalizer;
@@ -20,6 +22,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -83,8 +86,9 @@ public class PanelCoordinador extends JPanel {
         Btn bMaterias = new Btn("Materias",      Colores.PROFESOR);
         Btn bProfs    = new Btn("Profesores",    Colores.ESTUDIANTE);
         Btn bBuscarProf = new Btn("Buscar Prof", Colores.COORDINADOR);
+        Btn bResolver = new Btn("Resolver", Colores.ACENTO2);
 
-        for (Btn b : new Btn[]{bVer, bGenerar, bConfl, bMaterias, bProfs, bBuscarProf}) {
+        for (Btn b : new Btn[]{bVer, bGenerar, bConfl, bMaterias, bProfs, bBuscarProf, bResolver}) {
             b.setPreferredSize(new Dimension(100, 28));
             ctrl.add(b);
         }
@@ -95,6 +99,7 @@ public class PanelCoordinador extends JPanel {
         bMaterias.addActionListener(e -> verMaterias());
         bProfs.addActionListener(e    -> verProfesores());
         bBuscarProf.addActionListener(e -> buscarHorarioProfesor());
+        bResolver.addActionListener(e -> resolverConflictoSeleccionado());
 
         h.add(ctrl, BorderLayout.EAST);
         return h;
@@ -183,7 +188,7 @@ public class PanelCoordinador extends JPanel {
                 h.getAsignatura().tipo(),
                 h.getAsignatura().getProfesor() != null
                     ? h.getAsignatura().getProfesor().getNombre() : "-",
-                "Aula " + h.getAula().getNumero(),
+                textoAula(h),
                 h.tieneConflicto() ? "[!] " + h.getConflicto() : "OK"
             });
         }
@@ -343,6 +348,280 @@ public class PanelCoordinador extends JPanel {
         areaProfesores.setCaretPosition(0);
         lblInfo.setText("Horario consolidado del profesor: " + nombre.trim());
         lblInfo.setForeground(Colores.COORDINADOR);
+    }
+
+    private void resolverConflictoSeleccionado() {
+        Semestre semestreActual = actual();
+        if (!semestreActual.isGenerado()) {
+            lblInfo.setText("Primero genere y visualice un horario con conflictos.");
+            lblInfo.setForeground(Colores.PELIGRO);
+            return;
+        }
+
+        EntradaHorario conflicto = conflictoSeleccionado(semestreActual);
+        if (conflicto == null) {
+            lblInfo.setText("Seleccione una fila con conflicto en la tabla.");
+            lblInfo.setForeground(Colores.PELIGRO);
+            return;
+        }
+
+        String[] opciones = {
+                "Reasignar profesor (liberar otro curso)",
+                "Pasar curso a virtual",
+                "Contratar profesor",
+                "Agregar aula",
+                "Cancelar"
+        };
+        int op = JOptionPane.showOptionDialog(
+                this,
+                "Conflicto: " + conflicto.getAsignatura().getNombre() + "\nSeleccione una accion de coordinacion:",
+                "Resolver conflicto",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                opciones,
+                opciones[0]
+        );
+        if (op < 0 || op == 4) return;
+
+        switch (op) {
+            case 0:
+                resolverReasignandoProfesor(semestreActual, conflicto);
+                break;
+            case 1:
+                resolverComoVirtual(semestreActual, conflicto);
+                break;
+            case 2:
+                resolverContratandoProfesor(semestreActual, conflicto);
+                break;
+            case 3:
+                resolverAgregandoAula(semestreActual, conflicto);
+                break;
+            default:
+                return;
+        }
+
+        verHorario();
+        verConflictos();
+    }
+
+    private EntradaHorario conflictoSeleccionado(Semestre semestreActual) {
+        int fila = tabla.getSelectedRow();
+        if (fila >= 0 && fila < semestreActual.getHorario().size()) {
+            EntradaHorario e = semestreActual.getHorario().get(fila);
+            if (e.tieneConflicto()) return e;
+        }
+        return semestreActual.getHorario().stream()
+                .filter(EntradaHorario::tieneConflicto)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void resolverComoVirtual(Semestre semestreActual, EntradaHorario conflicto) {
+        boolean aplicado = Escenarios.marcarAsignaturaVirtual(conflicto.getAsignatura().getNombre());
+        if (!aplicado) {
+            lblInfo.setText("Solo asignaturas teoricas pueden pasar a virtual.");
+            lblInfo.setForeground(Colores.PELIGRO);
+            return;
+        }
+
+        regenerarSemestres(Arrays.asList(semestreActual));
+        lblInfo.setText("Curso movido a modalidad virtual y horario recalculado.");
+        lblInfo.setForeground(Colores.ACENTO2);
+    }
+
+    private void resolverContratandoProfesor(Semestre semestreActual, EntradaHorario conflicto) {
+        String departamento = seleccionarDepartamento(conflicto);
+        if (departamento == null || departamento.isBlank()) return;
+
+        String sugerido = "Prof. " + departamento;
+        String nombre = JOptionPane.showInputDialog(this,
+                "Nombre del nuevo profesor (" + departamento + "):",
+                sugerido);
+        if (nombre == null) return;
+        if (nombre.isBlank()) nombre = sugerido;
+
+        Profesor nuevo = Escenarios.contratarProfesor(nombre.trim(), departamento);
+        if (nuevo == null) {
+            lblInfo.setText("No fue posible contratar/registrar el profesor.");
+            lblInfo.setForeground(Colores.PELIGRO);
+            return;
+        }
+
+        conflicto.getAsignatura().setProfesor(nuevo);
+        regenerarSemestres(Arrays.asList(semestreActual));
+        lblInfo.setText("Profesor contratado y asignado. Horario recalculado.");
+        lblInfo.setForeground(Colores.ACENTO2);
+    }
+
+    private void resolverAgregandoAula(Semestre semestreActual, EntradaHorario conflicto) {
+        String tipo = conflicto.getAsignatura().tipoAula();
+
+        String nombre = JOptionPane.showInputDialog(this,
+                "Nombre de la nueva aula (" + tipo + "):",
+                "Aula " + (tipo.equals("laboratorio") ? "Lab" : "T"));
+        if (nombre == null || nombre.isBlank()) return;
+
+        String numeroTxt = JOptionPane.showInputDialog(this,
+                "Numero de aula (vacio = auto):",
+                "");
+        int numero = parseEntero(numeroTxt, -1);
+
+        String capacidadTxt = JOptionPane.showInputDialog(this,
+                "Capacidad:",
+                "30");
+        int capacidad = parseEntero(capacidadTxt, 30);
+
+        Aula nueva = Escenarios.agregarAula(tipo, nombre.trim(), numero, "Edif. Coordinacion", capacidad);
+        if (nueva == null) {
+            lblInfo.setText("No se pudo registrar la nueva aula.");
+            lblInfo.setForeground(Colores.PELIGRO);
+            return;
+        }
+        if (aulas.stream().noneMatch(a -> a.getNumero() == nueva.getNumero())) {
+            aulas.add(nueva);
+        }
+
+        regenerarSemestres(Arrays.asList(semestreActual));
+        lblInfo.setText("Nueva aula agregada y horario recalculado.");
+        lblInfo.setForeground(Colores.ACENTO2);
+    }
+
+    private void resolverReasignandoProfesor(Semestre semestreActual, EntradaHorario conflicto) {
+        String departamento = seleccionarDepartamento(conflicto);
+        if (departamento == null || departamento.isBlank()) return;
+
+        List<Profesor> candidatos = Escenarios.profesoresPorDepartamento(departamento);
+        if (candidatos.isEmpty()) {
+            lblInfo.setText("No hay profesores en el departamento " + departamento + ".");
+            lblInfo.setForeground(Colores.PELIGRO);
+            return;
+        }
+
+        Profesor profSeleccionado = (Profesor) JOptionPane.showInputDialog(
+                this,
+                "Profesor a reasignar (" + departamento + "):",
+                "Reasignar profesor",
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                candidatos.toArray(),
+                candidatos.get(0)
+        );
+        if (profSeleccionado == null) return;
+
+        List<CursoAsignado> cursos = cursosAsignadosDeProfesorEnOtrosSemestres(profSeleccionado, semestreActual);
+        if (cursos.isEmpty()) {
+            lblInfo.setText("Ese profesor no tiene cursos en otros semestres para liberar.");
+            lblInfo.setForeground(Colores.PELIGRO);
+            return;
+        }
+
+        CursoAsignado cursoALiberar = (CursoAsignado) JOptionPane.showInputDialog(
+                this,
+                "Seleccione el curso a eliminar para liberar al profesor:",
+                "Liberar curso",
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                cursos.toArray(),
+                cursos.get(0)
+        );
+        if (cursoALiberar == null) return;
+
+        removerCursoDeSemestre(cursoALiberar.semestre, cursoALiberar.nombreAsignatura);
+        conflicto.getAsignatura().setProfesor(profSeleccionado);
+        regenerarSemestres(Arrays.asList(semestreActual));
+
+        lblInfo.setText("Profesor reasignado y curso liberado en Semestre " + cursoALiberar.semestre.getNumero() + ".");
+        lblInfo.setForeground(Colores.ACENTO2);
+    }
+
+    private void removerCursoDeSemestre(Semestre semestre, String nombreAsignatura) {
+        String objetivo = normalizar(nombreAsignatura);
+        semestre.getAsignaturas().removeIf(a -> normalizar(a.getNombre()).equals(objetivo));
+
+        List<EntradaHorario> restante = semestre.getHorario().stream()
+                .filter(h -> normalizar(h.getAsignatura().getNombre()).equals(objetivo) == false)
+                .collect(Collectors.toList());
+        semestre.reemplazarHorario(restante);
+    }
+
+    private List<CursoAsignado> cursosAsignadosDeProfesorEnOtrosSemestres(Profesor profesor, Semestre excluir) {
+        List<CursoAsignado> out = new ArrayList<>();
+        for (Semestre s : Escenarios.todosLosSemestres()) {
+            if (s == excluir || !s.isGenerado()) continue;
+
+            Optional<EntradaHorario> primera = s.getHorario().stream()
+                    .filter(h -> h.getAsignatura() != null && h.getAsignatura().getProfesor() != null)
+                    .filter(h -> normalizar(h.getAsignatura().getProfesor().getNombre()).equals(normalizar(profesor.getNombre())))
+                    .findFirst();
+            if (primera.isPresent()) {
+                out.add(new CursoAsignado(s, primera.get().getAsignatura().getNombre()));
+            }
+        }
+        return out;
+    }
+
+    private String seleccionarDepartamento(EntradaHorario conflicto) {
+        String deptoDefault = null;
+        if (conflicto.getAsignatura() != null && conflicto.getAsignatura().getProfesor() != null) {
+            deptoDefault = conflicto.getAsignatura().getProfesor().getDepartamento();
+        }
+
+        List<String> departamentos = Escenarios.obtenerDepartamentos();
+        if (departamentos.isEmpty()) {
+            departamentos = Arrays.asList("Computacion");
+        }
+
+        Object seleccionado = JOptionPane.showInputDialog(
+                this,
+                "Departamento del curso/conflicto:",
+                "Seleccionar departamento",
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                departamentos.toArray(),
+                deptoDefault != null ? deptoDefault : departamentos.get(0)
+        );
+        return seleccionado == null ? null : seleccionado.toString();
+    }
+
+    private void regenerarSemestres(List<Semestre> objetivos) {
+        for (Semestre s : objetivos) {
+            s.reemplazarHorario(new ArrayList<>());
+        }
+        GeneradorHorarios.generarGlobal(objetivos, aulas, Escenarios.todosLosSemestres());
+        Escenarios.guardarHorariosGenerados();
+    }
+
+    private int parseEntero(String valor, int porDefecto) {
+        if (valor == null || valor.isBlank()) return porDefecto;
+        try {
+            return Integer.parseInt(valor.trim());
+        } catch (NumberFormatException ex) {
+            return porDefecto;
+        }
+    }
+
+    private String textoAula(EntradaHorario h) {
+        if (h.getAula() == null) return "-";
+        if (h.getAula().getNombre() != null && h.getAula().getNombre().startsWith("Virtual")) {
+            return "Virtual";
+        }
+        return "Aula " + h.getAula().getNumero();
+    }
+
+    private static class CursoAsignado {
+        private final Semestre semestre;
+        private final String nombreAsignatura;
+
+        private CursoAsignado(Semestre semestre, String nombreAsignatura) {
+            this.semestre = semestre;
+            this.nombreAsignatura = nombreAsignatura;
+        }
+
+        @Override
+        public String toString() {
+            return "Semestre " + semestre.getNumero() + " - " + nombreAsignatura;
+        }
     }
 
     private Map<String, List<EntradaHorario>> agruparPorDiaYHora(List<EntradaHorario> entradas) {
