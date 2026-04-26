@@ -61,7 +61,8 @@ public class Ventana extends JFrame {
         String[] nombres = {
             "I y II  - Basicos",
             "III y IV - Intermedios",
-            "V y VI  - Avanzados (con conflicto)"
+            "V y VI  - Avanzados",
+            "VII y VIII - Finales"
         };
         JComboBox<String> cmbEsc = new JComboBox<>(nombres);
         cmbEsc.setFont(Colores.PEQUENA);
@@ -72,6 +73,7 @@ public class Ventana extends JFrame {
                 case 0: semestresActivos = Escenarios.escenario1(); aulasActivas = Escenarios.aulasEscenario1(); break;
                 case 1: semestresActivos = Escenarios.escenario2(); aulasActivas = Escenarios.aulasEscenario2(); break;
                 case 2: semestresActivos = Escenarios.escenario3(); aulasActivas = Escenarios.aulasEscenario3(); break;
+                case 3: semestresActivos = Escenarios.escenario4(); aulasActivas = Escenarios.aulasEscenario4(); break;
             }
             mostrarLogin();
         });

@@ -27,6 +27,13 @@ public class Semestre {
     public List<Asignatura> getAsignaturas()      { return asignaturas; }
     public List<EntradaHorario> getHorario()      { return horario; }
     public boolean isGenerado()                   { return generado; }
+    public void reemplazarHorario(List<EntradaHorario> nuevoHorario) {
+        horario.clear();
+        if (nuevoHorario != null) {
+            horario.addAll(nuevoHorario);
+        }
+        generado = !horario.isEmpty();
+    }
 
     public void generar(List<Aula> aulas) {
         generar(aulas, Collections.emptyMap(), Collections.emptyMap(), new Random());
