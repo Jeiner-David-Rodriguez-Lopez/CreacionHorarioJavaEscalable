@@ -166,11 +166,14 @@ public class DatosMemoria implements FuenteAsignaturas {
         for (String obj : extraerObjetos(arr)) {
             String nombre = repararTexto(obtenerTexto(obj, "nombre"));
             String dep = repararTexto(obtenerTexto(obj, "Departamento"));
+            String cedula = repararTexto(obtenerTexto(obj, "cedula"));
             if (nombre == null || nombre.isBlank()) continue;
             if (dep == null || dep.isBlank()) dep = "General";
             String key = normalizar(nombre) + "|" + normalizar(dep);
             if (!dedupe.add(key)) continue;
-            String cedula = String.format("J-%04d", idx++);
+            if (cedula == null || cedula.isBlank()) {
+                cedula = String.format("J-%04d", idx++);
+            }
             profesores.add(new Profesor(nombre, cedula, dep, disponibilidadPorDefecto()));
         }
     }
@@ -375,24 +378,55 @@ public class DatosMemoria implements FuenteAsignaturas {
     }
 
     public Profesor agregarProfesorPersistente(String nombre, String departamento) {
+        return agregarProfesorPersistente(nombre, departamento, null);
+    }
+
+    public Profesor agregarProfesorPersistente(String nombre, String departamento, String cedulaIngresada) {
         String n = repararTexto(nombre);
         String d = repararTexto(departamento);
         if (n == null || n.isBlank() || d == null || d.isBlank()) return null;
 
-        for (Profesor p : profesores) {
-            if (normalizar(p.getNombre()).equals(normalizar(n))) {
-                return p;
-            }
+        String cedulaLimpia = cedulaNormalizada(cedulaIngresada);
+        if (cedulaLimpia != null && existeCedula(cedulaLimpia)) return null;
+
+        Profesor porNombre = profesorPorNombre(n);
+        if (porNombre != null) {
+            return porNombre;
         }
 
-        String cedula = "EXT-" + String.format("%04d", profesores.size() + 1);
+        String cedula = cedulaLimpia != null ? cedulaLimpia : siguienteCedulaExterna();
         Profesor nuevo = new Profesor(n.trim(), cedula, d.trim(), disponibilidadPorDefecto());
         profesores.add(nuevo);
 
         resoluciones.profesoresExtra.add(new ResolucionesCoordinadorJSON.ProfesorExtra(
-                nuevo.getNombre(), nuevo.getDepartamento(), nuevo.getCedula()));
+                nuevo.getNombre(), nuevo.getDepartamento(), nuevo.getCedula(), serializarDisponibilidad(nuevo.getDisponibilidad())));
         guardarResoluciones();
         return nuevo;
+    }
+
+    public boolean actualizarDisponibilidadProfesor(String cedula, List<Bloque> disponibilidad) {
+        String objetivo = cedulaNormalizada(cedula);
+        if (objetivo == null) return false;
+        Profesor profesor = profesorPorCedula(objetivo);
+        if (profesor == null) return false;
+
+        List<Bloque> nueva = (disponibilidad == null || disponibilidad.isEmpty())
+                ? disponibilidadPorDefecto()
+                : new ArrayList<>(disponibilidad);
+        profesor.setDisponibilidad(nueva);
+
+        ResolucionesCoordinadorJSON.ProfesorExtra extra = buscarProfesorExtraPorCedula(objetivo);
+        List<String> serializada = serializarDisponibilidad(nueva);
+        if (extra == null) {
+            resoluciones.profesoresExtra.add(new ResolucionesCoordinadorJSON.ProfesorExtra(
+                    profesor.getNombre(), profesor.getDepartamento(), profesor.getCedula(), serializada));
+        } else {
+            resoluciones.profesoresExtra.remove(extra);
+            resoluciones.profesoresExtra.add(new ResolucionesCoordinadorJSON.ProfesorExtra(
+                    extra.nombre, extra.departamento, extra.cedula, serializada));
+        }
+        guardarResoluciones();
+        return true;
     }
 
     public Aula agregarAulaPersistente(String tipo, String nombre, int numero, String ubicacion, int capacidad) {
@@ -460,6 +494,10 @@ public class DatosMemoria implements FuenteAsignaturas {
         return out;
     }
 
+    public Profesor buscarProfesorPorCedula(String cedula) {
+        return profesorPorCedula(cedulaNormalizada(cedula));
+    }
+
     @Override public List<Asignatura> obtenerMaterias()  { return materias; }
     @Override public List<Teorica>    obtenerTeoricas()  { return teoricas; }
     @Override public List<Practica>   obtenerPracticas() { return practicas; }
@@ -475,12 +513,20 @@ public class DatosMemoria implements FuenteAsignaturas {
         resoluciones.materiasVirtuales.addAll(datos.materiasVirtuales);
 
         for (ResolucionesCoordinadorJSON.ProfesorExtra p : resoluciones.profesoresExtra) {
+            Profesor existente = profesorPorCedula(cedulaNormalizada(p.cedula));
+            if (existente != null) {
+                List<Bloque> disponibilidad = deserializarDisponibilidad(p.disponibilidad);
+                if (!disponibilidad.isEmpty()) {
+                    existente.setDisponibilidad(disponibilidad);
+                }
+                continue;
+            }
             if (profesorPorNombre(p.nombre) != null) continue;
             profesores.add(new Profesor(
                     p.nombre,
                     p.cedula == null || p.cedula.isBlank() ? "EXT-" + (profesores.size() + 1) : p.cedula,
                     p.departamento,
-                    disponibilidadPorDefecto()));
+                    disponibilidadDesdePersistencia(p.disponibilidad)));
         }
 
         for (ResolucionesCoordinadorJSON.AulaExtra a : resoluciones.aulasExtra) {
@@ -525,5 +571,69 @@ public class DatosMemoria implements FuenteAsignaturas {
             if (normalizar(a.getNombre()).equals(objetivo)) return a;
         }
         return null;
+    }
+
+    private Profesor profesorPorCedula(String cedula) {
+        if (cedula == null) return null;
+        for (Profesor p : profesores) {
+            if (cedula.equalsIgnoreCase(cedulaNormalizada(p.getCedula()))) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    private boolean existeCedula(String cedula) {
+        return profesorPorCedula(cedula) != null;
+    }
+
+    private String cedulaNormalizada(String cedula) {
+        if (cedula == null) return null;
+        String c = cedula.trim();
+        return c.isEmpty() ? null : c;
+    }
+
+    private String siguienteCedulaExterna() {
+        int idx = profesores.size() + 1;
+        String c;
+        do {
+            c = "EXT-" + String.format("%04d", idx++);
+        } while (existeCedula(c));
+        return c;
+    }
+
+    private ResolucionesCoordinadorJSON.ProfesorExtra buscarProfesorExtraPorCedula(String cedula) {
+        if (cedula == null) return null;
+        for (ResolucionesCoordinadorJSON.ProfesorExtra p : resoluciones.profesoresExtra) {
+            if (cedula.equalsIgnoreCase(cedulaNormalizada(p.cedula))) return p;
+        }
+        return null;
+    }
+
+    private List<String> serializarDisponibilidad(List<Bloque> disponibilidad) {
+        List<String> out = new ArrayList<>();
+        if (disponibilidad == null) return out;
+        for (Bloque b : disponibilidad) {
+            if (b == null) continue;
+            out.add(b.getDia() + "|" + b.getInicio() + "|" + b.getFin());
+        }
+        return out;
+    }
+
+    private List<Bloque> deserializarDisponibilidad(List<String> datos) {
+        List<Bloque> out = new ArrayList<>();
+        if (datos == null) return out;
+        for (String raw : datos) {
+            if (raw == null || raw.isBlank()) continue;
+            String[] p = raw.split("\\|");
+            if (p.length != 3) continue;
+            out.add(new Bloque(p[0], p[1], p[2]));
+        }
+        return out;
+    }
+
+    private List<Bloque> disponibilidadDesdePersistencia(List<String> datos) {
+        List<Bloque> d = deserializarDisponibilidad(datos);
+        return d.isEmpty() ? disponibilidadPorDefecto() : d;
     }
 }

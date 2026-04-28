@@ -26,6 +26,7 @@ public class Profesor extends Usuario {
     public void setNombre(String n)       { this.nombre = n; }
     public void setCedula(String c)       { this.cedula = c; }
     public void setDepartamento(String d) { this.departamento = d; }
+    public void setDisponibilidad(List<Bloque> disponibilidad) { this.disponibilidad = disponibilidad; }
 
     @Override public String toString() { return nombre + " (" + departamento + ")"; }
 }

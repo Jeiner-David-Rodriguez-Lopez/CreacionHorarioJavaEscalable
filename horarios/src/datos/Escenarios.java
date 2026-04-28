@@ -85,6 +85,10 @@ public class Escenarios {
         return FUENTE.agregarProfesorPersistente(nombre, departamento);
     }
 
+    public static Profesor contratarProfesor(String nombre, String departamento, String cedula) {
+        return FUENTE.agregarProfesorPersistente(nombre, departamento, cedula);
+    }
+
     public static Aula agregarAula(String tipo, String nombre, int numero, String ubicacion, int capacidad) {
         return FUENTE.agregarAulaPersistente(tipo, nombre, numero, ubicacion, capacidad);
     }
@@ -99,6 +103,14 @@ public class Escenarios {
 
     public static List<Profesor> profesoresPorDepartamento(String departamento) {
         return FUENTE.obtenerProfesoresPorDepartamento(departamento);
+    }
+
+    public static Profesor profesorPorCedula(String cedula) {
+        return FUENTE.buscarProfesorPorCedula(cedula);
+    }
+
+    public static boolean actualizarDisponibilidadProfesor(String cedula, List<horario.Bloque> disponibilidad) {
+        return FUENTE.actualizarDisponibilidadProfesor(cedula, disponibilidad);
     }
 
     private static List<Semestre> filtrarSemestres(int desde, int hasta) {

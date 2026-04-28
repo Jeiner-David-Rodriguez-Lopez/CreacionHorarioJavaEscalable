@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -16,11 +17,17 @@ final class ResolucionesCoordinadorJSON {
         final String nombre;
         final String departamento;
         final String cedula;
+        final List<String> disponibilidad;
 
         ProfesorExtra(String nombre, String departamento, String cedula) {
+            this(nombre, departamento, cedula, Collections.emptyList());
+        }
+
+        ProfesorExtra(String nombre, String departamento, String cedula, List<String> disponibilidad) {
             this.nombre = nombre;
             this.departamento = departamento;
             this.cedula = cedula;
+            this.disponibilidad = disponibilidad == null ? Collections.emptyList() : new ArrayList<>(disponibilidad);
         }
     }
 
@@ -65,11 +72,12 @@ final class ResolucionesCoordinadorJSON {
                 String nombre = obtenerTexto(obj, "nombre");
                 String depto = obtenerTexto(obj, "departamento");
                 String cedula = obtenerTexto(obj, "cedula");
+                List<String> disponibilidad = obtenerArregloTextos(obj, "disponibilidad");
                 if (nombre == null || nombre.isBlank() || depto == null || depto.isBlank()) continue;
                 if (cedula == null || cedula.isBlank()) {
                     cedula = "EXT-" + (datos.profesoresExtra.size() + 1);
                 }
-                datos.profesoresExtra.add(new ProfesorExtra(nombre.trim(), depto.trim(), cedula.trim()));
+                datos.profesoresExtra.add(new ProfesorExtra(nombre.trim(), depto.trim(), cedula.trim(), disponibilidad));
             }
         }
 
@@ -112,7 +120,13 @@ final class ResolucionesCoordinadorJSON {
             ProfesorExtra p = datos.profesoresExtra.get(i);
             sb.append("    { \"nombre\": \"").append(escape(p.nombre))
               .append("\", \"departamento\": \"").append(escape(p.departamento))
-              .append("\", \"cedula\": \"").append(escape(p.cedula)).append("\" }");
+              .append("\", \"cedula\": \"").append(escape(p.cedula)).append("\"");
+            sb.append(", \"disponibilidad\": [");
+            for (int j = 0; j < p.disponibilidad.size(); j++) {
+                sb.append("\"").append(escape(p.disponibilidad.get(j))).append("\"");
+                if (j < p.disponibilidad.size() - 1) sb.append(", ");
+            }
+            sb.append("] }");
             if (i < datos.profesoresExtra.size() - 1) sb.append(',');
             sb.append('\n');
         }
@@ -200,5 +214,18 @@ final class ResolucionesCoordinadorJSON {
 
     private static String escape(String s) {
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private static List<String> obtenerArregloTextos(String obj, String key) {
+        Pattern p = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*\\[(.*?)]", Pattern.DOTALL);
+        Matcher m = p.matcher(obj);
+        if (!m.find()) return Collections.emptyList();
+        List<String> out = new ArrayList<>();
+        Matcher item = Pattern.compile("\"(.*?)\"", Pattern.DOTALL).matcher(m.group(1));
+        while (item.find()) {
+            String v = item.group(1);
+            if (v != null && !v.isBlank()) out.add(v.trim());
+        }
+        return out;
     }
 }

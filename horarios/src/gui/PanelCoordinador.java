@@ -1,7 +1,9 @@
 package gui;
 
 import aulas.Aula;
+import asignaturas.Asignatura;
 import datos.Escenarios;
+import horario.Bloque;
 import horario.EntradaHorario;
 import horario.GeneradorHorarios;
 import horario.Semestre;
@@ -260,7 +262,7 @@ public class PanelCoordinador extends JPanel {
             if (a.getProfesor() != null) {
                 profesores.add(String.format("%-22s %s",
                         a.getProfesor().getNombre(),
-                        a.getProfesor().getDepartamento()));
+                        a.getProfesor().getDepartamento() + " | Ced: " + a.getProfesor().getCedula()));
             }
         });
 
@@ -441,9 +443,18 @@ public class PanelCoordinador extends JPanel {
         if (nombre == null) return;
         if (nombre.isBlank()) nombre = sugerido;
 
-        Profesor nuevo = Escenarios.contratarProfesor(nombre.trim(), departamento);
+        String cedula = JOptionPane.showInputDialog(this,
+                "Cedula del profesor:",
+                "");
+        if (cedula == null || cedula.isBlank()) {
+            lblInfo.setText("Debe ingresar una cedula para registrar el profesor.");
+            lblInfo.setForeground(Colores.PELIGRO);
+            return;
+        }
+
+        Profesor nuevo = Escenarios.contratarProfesor(nombre.trim(), departamento, cedula.trim());
         if (nuevo == null) {
-            lblInfo.setText("No fue posible contratar/registrar el profesor.");
+            lblInfo.setText("No fue posible registrar el profesor. Cedula duplicada o datos invalidos.");
             lblInfo.setForeground(Colores.PELIGRO);
             return;
         }

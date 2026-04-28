@@ -4,6 +4,7 @@ import asignaturas.Asignatura;
 import asignaturas.Teorica;
 import aulas.Aula;
 import aulas.AulaTeoria;
+import usuarios.Profesor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -110,6 +111,7 @@ public class Semestre {
 
         for (Bloque b : candidatosBloque) {
             String bloqueKey = keyBloque(b);
+            if (!profesorDisponible(a.getProfesor(), b)) continue;
             if (profesorOcupado(a, bloqueKey, ocupacionProfesorLocal, ocupacionProfesorGlobal)) continue;
 
             List<Aula> compatibles = aulasCompatibles(a, aulas, rnd);
@@ -144,6 +146,7 @@ public class Semestre {
 
         for (Bloque b : candidatosBloque) {
             String bloqueKey = keyBloque(b);
+            if (!profesorDisponible(a.getProfesor(), b)) continue;
             if (!profesorOcupado(a, bloqueKey, ocupacionProfesorLocal, ocupacionProfesorGlobal)) {
                 return new Asignacion(b, aulaVirtual(a), null);
             }
@@ -164,6 +167,21 @@ public class Semestre {
         String pKey = nombre + "|" + bloqueKey;
         if (ocupacionProfesorLocal.contains(pKey)) return true;
         return ocupacionProfesorGlobal.getOrDefault(nombre, Collections.emptySet()).contains(bloqueKey);
+    }
+
+    private boolean profesorDisponible(Profesor profesor, Bloque bloque) {
+        if (profesor == null || bloque == null) return true;
+        List<Bloque> disponibilidad = profesor.getDisponibilidad();
+        if (disponibilidad == null || disponibilidad.isEmpty()) return true;
+        for (Bloque b : disponibilidad) {
+            if (b == null) continue;
+            if (b.getDia().equalsIgnoreCase(bloque.getDia())
+                    && b.getInicio().equals(bloque.getInicio())
+                    && b.getFin().equals(bloque.getFin())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<Aula> aulasCompatibles(Asignatura a, List<Aula> aulas, Random rnd) {

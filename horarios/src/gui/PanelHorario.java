@@ -1,9 +1,17 @@
 package gui;
 
 import aulas.Aula;
+import asignaturas.Asignatura;
+import datos.Escenarios;
+import horario.Bloque;
 import horario.EntradaHorario;
 import horario.Semestre;
+import usuarios.Profesor;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -19,11 +27,13 @@ public class PanelHorario extends JPanel {
     private JTable tabla;
     private DefaultTableModel modelo;
     private JLabel lblEstado;
+    private final boolean esVistaProfesor;
 
     public PanelHorario(List<Semestre> semestres, List<Aula> aulas,
                         String titulo, Color colorRol) {
         this.semestres = semestres;
         this.aulas     = aulas;
+        this.esVistaProfesor = titulo != null && titulo.toLowerCase().contains("profesor");
 
         setLayout(new BorderLayout(8, 8));
         setBackground(Colores.FONDO);
@@ -58,6 +68,13 @@ public class PanelHorario extends JPanel {
         ver.setPreferredSize(new Dimension(80, 28));
         ver.addActionListener(e -> cargar());
         sel.add(ver);
+
+        if (esVistaProfesor) {
+            Btn informar = new Btn("Informar asignaturas", colorRol);
+            informar.setPreferredSize(new Dimension(180, 28));
+            informar.addActionListener(e -> informarAsignaturasProfesor());
+            sel.add(informar);
+        }
         header.add(sel, BorderLayout.EAST);
         add(header, BorderLayout.NORTH);
 
@@ -147,5 +164,97 @@ public class PanelHorario extends JPanel {
             return "Virtual";
         }
         return "Aula " + h.getAula().getNumero();
+    }
+
+    private void informarAsignaturasProfesor() {
+        String cedula = JOptionPane.showInputDialog(this,
+                "Ingrese su cedula:",
+                "Informar asignaturas",
+                JOptionPane.QUESTION_MESSAGE);
+        if (cedula == null) return;
+
+        Profesor profesor = Escenarios.profesorPorCedula(cedula.trim());
+        if (profesor == null) {
+            lblEstado.setText("Cedula no registrada en el sistema.");
+            lblEstado.setForeground(Colores.PELIGRO);
+            return;
+        }
+
+        String cursos = resumenCursosProfesor(profesor);
+        JCheckBox[] dias = new JCheckBox[]{
+                new JCheckBox("Lunes"), new JCheckBox("Martes"), new JCheckBox("Miercoles"),
+                new JCheckBox("Jueves"), new JCheckBox("Viernes")
+        };
+        JCheckBox manana = new JCheckBox("Manana");
+        JCheckBox tarde = new JCheckBox("Tarde");
+        manana.setSelected(true);
+        tarde.setSelected(true);
+        for (JCheckBox dia : dias) dia.setSelected(true);
+
+        JPanel panel = new JPanel(new GridLayout(0, 1, 4, 4));
+        panel.add(new JLabel("Profesor: " + profesor.getNombre() + " | Cedula: " + profesor.getCedula()));
+        panel.add(new JLabel("Asignaturas actuales: " + cursos));
+        panel.add(new JLabel("Dias en que desea impartir clases:"));
+        for (JCheckBox dia : dias) panel.add(dia);
+        panel.add(new JLabel("Jornada por dias seleccionados:"));
+        panel.add(manana);
+        panel.add(tarde);
+
+        int op = JOptionPane.showConfirmDialog(this, panel, "Informar asignaturas", JOptionPane.OK_CANCEL_OPTION);
+        if (op != JOptionPane.OK_OPTION) return;
+
+        List<String> diasSeleccionados = new ArrayList<>();
+        for (JCheckBox dia : dias) {
+            if (dia.isSelected()) diasSeleccionados.add(dia.getText());
+        }
+        if (diasSeleccionados.isEmpty() || (!manana.isSelected() && !tarde.isSelected())) {
+            lblEstado.setText("Debe seleccionar al menos un dia y una jornada.");
+            lblEstado.setForeground(Colores.PELIGRO);
+            return;
+        }
+
+        List<Bloque> disponibilidad = construirDisponibilidad(diasSeleccionados, manana.isSelected(), tarde.isSelected());
+        boolean ok = Escenarios.actualizarDisponibilidadProfesor(profesor.getCedula(), disponibilidad);
+        if (!ok) {
+            lblEstado.setText("No se pudo guardar su disponibilidad.");
+            lblEstado.setForeground(Colores.PELIGRO);
+            return;
+        }
+
+        lblEstado.setText("Disponibilidad registrada para " + profesor.getNombre() + ".");
+        lblEstado.setForeground(Colores.ACENTO2);
+    }
+
+    private String resumenCursosProfesor(Profesor profesor) {
+        String cedula = normalizar(profesor.getCedula());
+        Set<String> cursos = new LinkedHashSet<>();
+        for (Semestre s : Escenarios.todosLosSemestres()) {
+            for (Asignatura a : s.getAsignaturas()) {
+                if (a.getProfesor() == null) continue;
+                if (normalizar(a.getProfesor().getCedula()).equals(cedula)) {
+                    cursos.add(a.getNombre());
+                }
+            }
+        }
+        return cursos.isEmpty() ? "sin asignaturas asignadas" : String.join(", ", cursos);
+    }
+
+    private List<Bloque> construirDisponibilidad(List<String> dias, boolean incluirManana, boolean incluirTarde) {
+        List<Bloque> out = new ArrayList<>();
+        Set<String> diasSet = dias.stream().map(this::normalizar).collect(Collectors.toSet());
+        for (String dia : Bloque.DIAS) {
+            if (!diasSet.contains(normalizar(dia))) continue;
+            for (String[] slot : Bloque.SLOTS) {
+                boolean esManana = slot[0].compareTo("12:00") < 0;
+                if ((esManana && incluirManana) || (!esManana && incluirTarde)) {
+                    out.add(new Bloque(dia, slot[0], slot[1]));
+                }
+            }
+        }
+        return out;
+    }
+
+    private String normalizar(String s) {
+        return s == null ? "" : s.trim().toLowerCase();
     }
 }
