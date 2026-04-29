@@ -473,6 +473,22 @@ public class DatosMemoria implements FuenteAsignaturas {
         return true;
     }
 
+    public boolean marcarAsignaturaPresencialPersistente(String nombreAsignatura) {
+        if (nombreAsignatura == null || nombreAsignatura.isBlank()) return false;
+        Asignatura a = buscarMateriaPorNombre(nombreAsignatura);
+        if (!(a instanceof Teorica)) {
+            return false;
+        }
+        ((Teorica) a).setModalidad("Presencial");
+
+        boolean removida = resoluciones.materiasVirtuales.removeIf(
+                m -> normalizar(m).equals(normalizar(a.getNombre())));
+        if (removida) {
+            guardarResoluciones();
+        }
+        return true;
+    }
+
     public List<String> obtenerDepartamentos() {
         Set<String> out = new LinkedHashSet<>();
         for (Profesor p : profesores) {

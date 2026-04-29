@@ -1,8 +1,9 @@
 {
   "profesoresExtra": [
-    { "nombre": "Juan Pérez", "departamento": "Idiomas", "cedula": "1", "disponibilidad": ["Lunes|07:00|07:50", "Lunes|07:55|08:45", "Lunes|08:50|09:40", "Lunes|09:45|10:35", "Lunes|10:40|11:30", "Martes|07:00|07:50", "Martes|07:55|08:45", "Martes|08:50|09:40", "Martes|09:45|10:35", "Martes|10:40|11:30"] }
+    { "nombre": "Jean Marín", "departamento": "Ciencias", "cedula": "3", "disponibilidad": ["Lunes|07:00|07:50", "Lunes|07:55|08:45", "Lunes|08:50|09:40", "Lunes|09:45|10:35", "Lunes|10:40|11:30", "Viernes|07:00|07:50", "Viernes|07:55|08:45", "Viernes|08:50|09:40", "Viernes|09:45|10:35", "Viernes|10:40|11:30"] },
+    { "nombre": "Oscar Campos", "departamento": "Computación", "cedula": "18", "disponibilidad": ["Lunes|12:30|13:20", "Lunes|13:25|14:15", "Lunes|14:20|15:10", "Lunes|15:15|16:00", "Martes|12:30|13:20", "Martes|13:25|14:15", "Martes|14:20|15:10", "Martes|15:15|16:00"] }
   ],
   "aulasExtra": [
   ],
-  "materiasVirtuales": []
+  "materiasVirtuales": ["Desarrollo Web", "Programación I"]
 }

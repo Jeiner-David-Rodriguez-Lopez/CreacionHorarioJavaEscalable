@@ -3,13 +3,16 @@ package gui;
 import aulas.Aula;
 import asignaturas.Asignatura;
 import datos.Escenarios;
+import datos.InfoAcademicaPersistencia;
 import horario.Bloque;
 import horario.EntradaHorario;
 import horario.Semestre;
 import usuarios.Profesor;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -28,12 +31,16 @@ public class PanelHorario extends JPanel {
     private DefaultTableModel modelo;
     private JLabel lblEstado;
     private final boolean esVistaProfesor;
+    private final boolean esVistaEstudiante;
+    private JDesktopPane escritorio;
+    private JInternalFrame frameCursos;
 
     public PanelHorario(List<Semestre> semestres, List<Aula> aulas,
                         String titulo, Color colorRol) {
         this.semestres = semestres;
         this.aulas     = aulas;
         this.esVistaProfesor = titulo != null && titulo.toLowerCase().contains("profesor");
+        this.esVistaEstudiante = titulo != null && titulo.toLowerCase().contains("estudiante");
 
         setLayout(new BorderLayout(8, 8));
         setBackground(Colores.FONDO);
@@ -69,6 +76,13 @@ public class PanelHorario extends JPanel {
         ver.addActionListener(e -> cargar());
         sel.add(ver);
 
+        if (esVistaEstudiante) {
+            Btn cursos = new Btn("Cursos y aulas", colorRol);
+            cursos.setPreferredSize(new Dimension(130, 28));
+            cursos.addActionListener(e -> mostrarCursosEstudiante(colorRol));
+            sel.add(cursos);
+        }
+
         if (esVistaProfesor) {
             Btn informar = new Btn("Informar asignaturas", colorRol);
             informar.setPreferredSize(new Dimension(180, 28));
@@ -89,7 +103,17 @@ public class PanelHorario extends JPanel {
         JScrollPane scroll = new JScrollPane(tabla);
         scroll.getViewport().setBackground(Colores.FONDO);
         scroll.setBorder(BorderFactory.createLineBorder(Colores.BORDE));
-        add(scroll, BorderLayout.CENTER);
+
+        escritorio = new JDesktopPane();
+        escritorio.setBackground(Colores.FONDO);
+        scroll.setBounds(0, 0, 900, 420);
+        escritorio.add(scroll, JLayeredPane.DEFAULT_LAYER);
+        escritorio.addComponentListener(new java.awt.event.ComponentAdapter() {
+            public void componentResized(java.awt.event.ComponentEvent e) {
+                scroll.setBounds(0, 0, escritorio.getWidth(), escritorio.getHeight());
+            }
+        });
+        add(esVistaEstudiante ? escritorio : scroll, BorderLayout.CENTER);
 
         // Estado
         lblEstado = new JLabel("Seleccione un semestre y presione Ver.");
@@ -152,6 +176,9 @@ public class PanelHorario extends JPanel {
                     setBackground(r % 2 == 0 ? Colores.PANEL : Colores.FONDO);
                     setForeground(Colores.TEXTO);
                 }
+                if (Color.WHITE.equals(getBackground())) {
+                    setForeground(Color.BLACK);
+                }
                 setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
                 return this;
             }
@@ -164,6 +191,144 @@ public class PanelHorario extends JPanel {
             return "Virtual";
         }
         return "Aula " + h.getAula().getNumero();
+    }
+
+    private void mostrarCursosEstudiante(Color colorRol) {
+        int idx = combo.getSelectedIndex();
+        Semestre semestre = semestres.get(idx);
+        if (!semestre.isGenerado()) {
+            lblEstado.setText("Horario no disponible. El coordinador debe generarlo primero.");
+            lblEstado.setForeground(Colores.PELIGRO);
+            return;
+        }
+
+        DefaultTableModel modeloCursos = new DefaultTableModel(new String[]{
+                "Curso", "Profesor", "Cedula", "Tipo aula", "Aula", "Amenidades", "Cupo", "Registrados"
+        }, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+
+        List<EntradaHorario> entradas = entradasUnicasPorCurso(semestre);
+        for (EntradaHorario h : entradas) {
+            Profesor profesor = h.getAsignatura().getProfesor();
+            InfoAcademicaPersistencia.CursoInfo info =
+                    InfoAcademicaPersistencia.infoCurso(semestre, h.getAsignatura());
+            modeloCursos.addRow(new Object[]{
+                    h.getAsignatura().getNombre(),
+                    profesor != null ? profesor.getNombre() : "-",
+                    profesor != null ? profesor.getCedula() : "-",
+                    tipoAulaVisible(h.getAsignatura()),
+                    textoAula(h),
+                    InfoAcademicaPersistencia.amenidadesAula(h.getAula()),
+                    info.getCupo(),
+                    info.getRegistrados()
+            });
+        }
+
+        JTable tablaCursos = new JTable(modeloCursos);
+        tablaCursos.setBackground(Colores.PANEL);
+        tablaCursos.setForeground(Colores.TEXTO);
+        tablaCursos.setFont(Colores.PEQUENA);
+        tablaCursos.setRowHeight(26);
+        tablaCursos.setGridColor(Colores.BORDE);
+        tablaCursos.setSelectionBackground(colorRol);
+        tablaCursos.setSelectionForeground(Color.WHITE);
+        tablaCursos.getTableHeader().setBackground(colorRol);
+        tablaCursos.getTableHeader().setForeground(Color.WHITE);
+        tablaCursos.getTableHeader().setFont(Colores.PEQUENA);
+        tablaCursos.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            public Component getTableCellRendererComponent(JTable t, Object v,
+                    boolean sel, boolean foc, int r, int c) {
+                super.getTableCellRendererComponent(t, v, sel, foc, r, c);
+                if (sel) {
+                    setBackground(colorRol);
+                    setForeground(Color.WHITE);
+                } else {
+                    setBackground(r % 2 == 0 ? Colores.PANEL : Colores.FONDO);
+                    setForeground(Colores.TEXTO);
+                }
+                if (Color.WHITE.equals(getBackground())) {
+                    setForeground(Color.BLACK);
+                }
+                setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
+                return this;
+            }
+        });
+
+        JLabel detalle = new JLabel("Seleccione un curso para ver el equipamiento del aula.");
+        detalle.setFont(Colores.PEQUENA);
+        detalle.setForeground(Colores.TEXTO_TENUE);
+        detalle.setBorder(new EmptyBorder(4, 8, 4, 8));
+        tablaCursos.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) actualizarDetalleAula(tablaCursos, entradas, detalle);
+        });
+
+        Btn matricular = new Btn("Matricular", colorRol);
+        matricular.setPreferredSize(new Dimension(120, 28));
+        matricular.addActionListener(e -> matricularCurso(tablaCursos, modeloCursos, entradas, semestre, detalle));
+
+        JPanel sur = new JPanel(new BorderLayout(8, 0));
+        sur.setBackground(Colores.PANEL);
+        sur.setBorder(new EmptyBorder(6, 6, 6, 6));
+        sur.add(detalle, BorderLayout.CENTER);
+        sur.add(matricular, BorderLayout.EAST);
+
+        JPanel contenido = new JPanel(new BorderLayout());
+        contenido.setBackground(Colores.PANEL);
+        contenido.add(new JScrollPane(tablaCursos), BorderLayout.CENTER);
+        contenido.add(sur, BorderLayout.SOUTH);
+
+        if (frameCursos != null) frameCursos.dispose();
+        frameCursos = new JInternalFrame("Cursos disponibles - Estudiante", true, true, true, true);
+        frameCursos.setContentPane(contenido);
+        frameCursos.setSize(Math.max(780, escritorio.getWidth() - 80), Math.max(300, escritorio.getHeight() - 80));
+        frameCursos.setLocation(30, 30);
+        frameCursos.setVisible(true);
+        escritorio.add(frameCursos, JLayeredPane.PALETTE_LAYER);
+        try {
+            frameCursos.setSelected(true);
+        } catch (java.beans.PropertyVetoException ignored) {
+        }
+
+        lblEstado.setText("Lista de cursos, aulas, cupos y matricula cargada para Semestre " + semestre.getNumero() + ".");
+        lblEstado.setForeground(Colores.ACENTO2);
+    }
+
+    private List<EntradaHorario> entradasUnicasPorCurso(Semestre semestre) {
+        Map<String, EntradaHorario> porCurso = new LinkedHashMap<>();
+        for (EntradaHorario h : semestre.getHorario()) {
+            if (h.getAsignatura() == null) continue;
+            porCurso.putIfAbsent(normalizar(h.getAsignatura().getNombre()), h);
+        }
+        return new ArrayList<>(porCurso.values());
+    }
+
+    private void actualizarDetalleAula(JTable tablaCursos, List<EntradaHorario> entradas, JLabel detalle) {
+        int fila = tablaCursos.getSelectedRow();
+        if (fila < 0 || fila >= entradas.size()) return;
+        EntradaHorario h = entradas.get(fila);
+        detalle.setText(textoAula(h) + " porta: " + InfoAcademicaPersistencia.amenidadesAula(h.getAula()));
+    }
+
+    private void matricularCurso(JTable tablaCursos, DefaultTableModel modeloCursos,
+                                 List<EntradaHorario> entradas, Semestre semestre, JLabel detalle) {
+        int fila = tablaCursos.getSelectedRow();
+        if (fila < 0 || fila >= entradas.size()) {
+            detalle.setText("Seleccione un curso antes de matricular.");
+            return;
+        }
+        EntradaHorario h = entradas.get(fila);
+        boolean ok = InfoAcademicaPersistencia.matricular(semestre, h.getAsignatura());
+        InfoAcademicaPersistencia.CursoInfo info = InfoAcademicaPersistencia.infoCurso(semestre, h.getAsignatura());
+        modeloCursos.setValueAt(info.getRegistrados(), fila, 7);
+        detalle.setText(ok
+                ? "Matricula registrada en " + h.getAsignatura().getNombre() + "."
+                : "El curso " + h.getAsignatura().getNombre() + " ya no tiene cupos disponibles.");
+    }
+
+    private String tipoAulaVisible(Asignatura asignatura) {
+        if (asignatura == null) return "-";
+        return "teoria".equalsIgnoreCase(asignatura.tipoAula()) ? "Teorico" : "Practico";
     }
 
     private void informarAsignaturasProfesor() {
@@ -221,8 +386,15 @@ public class PanelHorario extends JPanel {
             return;
         }
 
-        lblEstado.setText("Disponibilidad registrada para " + profesor.getNombre() + ".");
-        lblEstado.setForeground(Colores.ACENTO2);
+        int conflictos = Escenarios.marcarConflictosPorDisponibilidad(profesor.getCedula());
+        if (conflictos > 0) {
+            lblEstado.setText("Sugerencia registrada. Se generaron " + conflictos
+                    + " conflictos para que el coordinador los resuelva.");
+            lblEstado.setForeground(Colores.PELIGRO);
+        } else {
+            lblEstado.setText("Disponibilidad registrada para " + profesor.getNombre() + " sin conflictos.");
+            lblEstado.setForeground(Colores.ACENTO2);
+        }
     }
 
     private String resumenCursosProfesor(Profesor profesor) {

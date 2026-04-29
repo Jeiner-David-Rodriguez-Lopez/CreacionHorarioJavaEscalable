@@ -1,6 +1,8 @@
 package datos;
 
 import aulas.Aula;
+import horario.Bloque;
+import horario.EntradaHorario;
 import horario.Semestre;
 import usuarios.Profesor;
 
@@ -97,6 +99,10 @@ public class Escenarios {
         return FUENTE.marcarAsignaturaVirtualPersistente(nombreAsignatura);
     }
 
+    public static boolean marcarAsignaturaPresencial(String nombreAsignatura) {
+        return FUENTE.marcarAsignaturaPresencialPersistente(nombreAsignatura);
+    }
+
     public static List<String> obtenerDepartamentos() {
         return FUENTE.obtenerDepartamentos();
     }
@@ -113,6 +119,32 @@ public class Escenarios {
         return FUENTE.actualizarDisponibilidadProfesor(cedula, disponibilidad);
     }
 
+    public static int marcarConflictosPorDisponibilidad(String cedula) {
+        Profesor profesor = FUENTE.buscarProfesorPorCedula(cedula);
+        if (profesor == null) return 0;
+
+        String objetivo = normalizar(cedula);
+        int conflictos = 0;
+        for (Semestre s : SEMESTRES.values()) {
+            if (!s.isGenerado()) continue;
+            for (EntradaHorario h : s.getHorario()) {
+                if (h.getAsignatura() == null || h.getAsignatura().getProfesor() == null) continue;
+                if (!normalizar(h.getAsignatura().getProfesor().getCedula()).equals(objetivo)) continue;
+
+                if (h.getConflicto() != null && h.getConflicto().startsWith("Sugerencia de horario del profesor")) {
+                    h.setConflicto(null);
+                }
+                if (!profesorDisponible(profesor, h.getBloque())) {
+                    h.setConflicto("Sugerencia de horario del profesor (" + profesor.getNombre()
+                            + ") no coincide con este bloque");
+                    conflictos++;
+                }
+            }
+        }
+        guardarHorariosGenerados();
+        return conflictos;
+    }
+
     private static List<Semestre> filtrarSemestres(int desde, int hasta) {
         List<Semestre> out = new ArrayList<>();
         for (int s = desde; s <= hasta; s++) {
@@ -122,5 +154,24 @@ public class Escenarios {
             }
         }
         return out;
+    }
+
+    private static boolean profesorDisponible(Profesor profesor, Bloque bloque) {
+        if (profesor == null || bloque == null) return true;
+        List<Bloque> disponibilidad = profesor.getDisponibilidad();
+        if (disponibilidad == null || disponibilidad.isEmpty()) return true;
+        for (Bloque b : disponibilidad) {
+            if (b == null) continue;
+            if (b.getDia().equalsIgnoreCase(bloque.getDia())
+                    && b.getInicio().equals(bloque.getInicio())
+                    && b.getFin().equals(bloque.getFin())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String normalizar(String s) {
+        return s == null ? "" : s.trim().toLowerCase();
     }
 }

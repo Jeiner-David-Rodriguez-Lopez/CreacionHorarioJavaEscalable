@@ -1,0 +1,8 @@
+{
+  "profesoresExtra": [
+    { "nombre": "Marcos Zamora", "departamento": "Computación", "cedula": "9", "disponibilidad": ["Martes|07:00|07:50", "Martes|07:55|08:45", "Martes|08:50|09:40", "Martes|09:45|10:35", "Martes|10:40|11:30", "Miercoles|07:00|07:50", "Miercoles|07:55|08:45", "Miercoles|08:50|09:40", "Miercoles|09:45|10:35", "Miercoles|10:40|11:30"] }
+  ],
+  "aulasExtra": [
+  ],
+  "materiasVirtuales": ["Desarrollo Web"]
+}

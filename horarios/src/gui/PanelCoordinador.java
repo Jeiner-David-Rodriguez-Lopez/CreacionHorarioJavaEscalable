@@ -2,6 +2,7 @@ package gui;
 
 import aulas.Aula;
 import asignaturas.Asignatura;
+import asignaturas.Teorica;
 import datos.Escenarios;
 import horario.Bloque;
 import horario.EntradaHorario;
@@ -279,15 +280,23 @@ public class PanelCoordinador extends JPanel {
     }
 
     private void buscarHorarioProfesor() {
-        String nombre = JOptionPane.showInputDialog(this,
-                "Ingrese el nombre del profesor:",
+        String cedula = JOptionPane.showInputDialog(this,
+                "Ingrese la cedula del profesor:",
                 "Buscar horario de profesor",
                 JOptionPane.QUESTION_MESSAGE);
-        if (nombre == null) return;
+        if (cedula == null) return;
 
-        String objetivo = normalizar(nombre);
+        String objetivo = normalizar(cedula);
         if (objetivo.isBlank()) {
-            lblInfo.setText("Debe ingresar un nombre de profesor valido.");
+            lblInfo.setText("Debe ingresar una cedula valida.");
+            lblInfo.setForeground(Colores.PELIGRO);
+            return;
+        }
+
+        Profesor profesor = Escenarios.profesorPorCedula(cedula.trim());
+        if (profesor == null) {
+            areaProfesores.setText("No existe un profesor con cedula \"" + cedula.trim() + "\".");
+            lblInfo.setText("Cedula no registrada.");
             lblInfo.setForeground(Colores.PELIGRO);
             return;
         }
@@ -299,7 +308,7 @@ public class PanelCoordinador extends JPanel {
 
             List<EntradaHorario> delProfesor = s.getHorario().stream()
                     .filter(h -> h.getAsignatura() != null && h.getAsignatura().getProfesor() != null)
-                    .filter(h -> normalizar(h.getAsignatura().getProfesor().getNombre()).contains(objetivo))
+                    .filter(h -> normalizar(h.getAsignatura().getProfesor().getCedula()).equals(objetivo))
                     .collect(Collectors.toList());
 
             if (delProfesor.isEmpty()) continue;
@@ -320,7 +329,7 @@ public class PanelCoordinador extends JPanel {
         }
 
         if (sb.length() == 0) {
-            areaProfesores.setText("No se encontraron horarios para \"" + nombre.trim() + "\".\n"
+            areaProfesores.setText("No se encontraron horarios para \"" + profesor.getNombre() + "\" (Ced: " + profesor.getCedula() + ").\n"
                     + "Nota: solo se consultan semestres ya generados.");
             lblInfo.setText("Sin coincidencias para el profesor ingresado.");
             lblInfo.setForeground(Colores.PELIGRO);
@@ -348,7 +357,7 @@ public class PanelCoordinador extends JPanel {
 
         areaProfesores.setText(sb.toString());
         areaProfesores.setCaretPosition(0);
-        lblInfo.setText("Horario consolidado del profesor: " + nombre.trim());
+        lblInfo.setText("Horario consolidado del profesor: " + profesor.getNombre() + " (Ced: " + profesor.getCedula() + ")");
         lblInfo.setForeground(Colores.COORDINADOR);
     }
 
@@ -369,7 +378,9 @@ public class PanelCoordinador extends JPanel {
 
         String[] opciones = {
                 "Reasignar profesor (liberar otro curso)",
-                "Pasar curso a virtual",
+                "Cambiar presencial/virtual",
+                "Cambiar horario",
+                "Borrar curso",
                 "Contratar profesor",
                 "Agregar aula",
                 "Cancelar"
@@ -384,19 +395,25 @@ public class PanelCoordinador extends JPanel {
                 opciones,
                 opciones[0]
         );
-        if (op < 0 || op == 4) return;
+        if (op < 0 || op == 6) return;
 
         switch (op) {
             case 0:
                 resolverReasignandoProfesor(semestreActual, conflicto);
                 break;
             case 1:
-                resolverComoVirtual(semestreActual, conflicto);
+                resolverCambiandoModalidad(semestreActual, conflicto);
                 break;
             case 2:
-                resolverContratandoProfesor(semestreActual, conflicto);
+                resolverCambiandoHorario(semestreActual, conflicto);
                 break;
             case 3:
+                resolverBorrandoCurso(semestreActual, conflicto);
+                break;
+            case 4:
+                resolverContratandoProfesor(semestreActual, conflicto);
+                break;
+            case 5:
                 resolverAgregandoAula(semestreActual, conflicto);
                 break;
             default:
@@ -419,16 +436,48 @@ public class PanelCoordinador extends JPanel {
                 .orElse(null);
     }
 
-    private void resolverComoVirtual(Semestre semestreActual, EntradaHorario conflicto) {
-        boolean aplicado = Escenarios.marcarAsignaturaVirtual(conflicto.getAsignatura().getNombre());
+    private void resolverCambiandoModalidad(Semestre semestreActual, EntradaHorario conflicto) {
+        if (!(conflicto.getAsignatura() instanceof Teorica)) {
+            lblInfo.setText("Solo asignaturas teoricas pueden cambiar entre presencial y virtual.");
+            lblInfo.setForeground(Colores.PELIGRO);
+            return;
+        }
+
+        Teorica teorica = (Teorica) conflicto.getAsignatura();
+        boolean esVirtual = teorica.getModalidad() != null
+                && teorica.getModalidad().trim().equalsIgnoreCase("Virtual");
+        boolean aplicado = esVirtual
+                ? Escenarios.marcarAsignaturaPresencial(teorica.getNombre())
+                : Escenarios.marcarAsignaturaVirtual(teorica.getNombre());
         if (!aplicado) {
-            lblInfo.setText("Solo asignaturas teoricas pueden pasar a virtual.");
+            lblInfo.setText("No se pudo cambiar la modalidad del curso.");
             lblInfo.setForeground(Colores.PELIGRO);
             return;
         }
 
         regenerarSemestres(Arrays.asList(semestreActual));
-        lblInfo.setText("Curso movido a modalidad virtual y horario recalculado.");
+        lblInfo.setText("Curso movido a modalidad " + (esVirtual ? "presencial" : "virtual") + " y horario recalculado.");
+        lblInfo.setForeground(Colores.ACENTO2);
+    }
+
+    private void resolverCambiandoHorario(Semestre semestreActual, EntradaHorario conflicto) {
+        regenerarSemestres(Arrays.asList(semestreActual));
+        lblInfo.setText("Horario recalculado para resolver el conflicto de " + conflicto.getAsignatura().getNombre() + ".");
+        lblInfo.setForeground(Colores.ACENTO2);
+    }
+
+    private void resolverBorrandoCurso(Semestre semestreActual, EntradaHorario conflicto) {
+        int op = JOptionPane.showConfirmDialog(
+                this,
+                "Se eliminara el curso completo:\n" + conflicto.getAsignatura().getNombre(),
+                "Borrar curso en conflicto",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+        if (op != JOptionPane.OK_OPTION) return;
+
+        removerCursoDeSemestre(semestreActual, conflicto.getAsignatura().getNombre());
+        Escenarios.guardarHorariosGenerados();
+        lblInfo.setText("Curso eliminado para resolver el conflicto.");
         lblInfo.setForeground(Colores.ACENTO2);
     }
 
@@ -701,6 +750,9 @@ public class PanelCoordinador extends JPanel {
                 } else {
                     setBackground(r % 2 == 0 ? Colores.PANEL : Colores.FONDO);
                     setForeground(Colores.TEXTO);
+                }
+                if (Color.WHITE.equals(getBackground())) {
+                    setForeground(Color.BLACK);
                 }
                 setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
                 return this;
